@@ -1,10 +1,8 @@
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 const axios = require("axios");
-const fs = require("fs").promises;
 const mongoose = require("mongoose");
+const express = require("express");
 require("dotenv").config();
-
-const API_URL = "https://api.watcher.guru/content/data?news=10";
 
 // MongoDB Schema to save last timestamp and article info
 const articleSchema = new mongoose.Schema({
@@ -16,6 +14,9 @@ const articleSchema = new mongoose.Schema({
 });
 
 const Article = mongoose.model("Article", articleSchema);
+
+// MongoDB URI and API URL
+const API_URL = "https://api.watcher.guru/content/data?news=10";
 
 // Connect to MongoDB
 mongoose.set("strictQuery", false); // Switch to false as per Mongoose's future behavior
@@ -118,4 +119,16 @@ client.once("ready", async () => {
   }, 60000); // Run every 1 minute
 });
 
+// Start the HTTP server to avoid the port-binding warning
+const app = express();
+app.get("/", (req, res) => {
+  res.send("Bot is running!");
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ HTTP Server is listening on port ${PORT}`);
+});
+
+// Bot login
 client.login(process.env.BOT_TOKEN);
