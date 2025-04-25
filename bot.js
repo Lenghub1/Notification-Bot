@@ -20,7 +20,6 @@ const API_URL = "https://api.watcher.guru/content/data?news=10";
 
 // Connect to MongoDB
 mongoose.set("strictQuery", false);
-
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -72,6 +71,14 @@ async function saveArticles(newArticles) {
   }
 }
 
+// Helper to validate URLs
+function isValidImageUrl(url) {
+  return (
+    typeof url === "string" &&
+    /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)$/i.test(url)
+  );
+}
+
 // Main bot logic
 client.once("ready", async () => {
   console.log(`🤖 Logged in as ${client.user.tag}`);
@@ -100,9 +107,14 @@ client.once("ready", async () => {
             .setTitle(article.title)
             .setURL(article.url)
             .setDescription(article.description)
-            .setThumbnail(article.image_hd)
             .setColor("#FF0000")
             .setTimestamp(article.published * 1000);
+
+          if (isValidImageUrl(article.image_hd)) {
+            embed.setThumbnail(article.image_hd);
+          } else {
+            console.warn("⚠️ Skipped invalid thumbnail URL:", article.image_hd);
+          }
 
           await channel.send("@everyone");
           await channel.send({ embeds: [embed] });
