@@ -18,7 +18,8 @@ const articleSchema = new mongoose.Schema({
 const Article = mongoose.model("Article", articleSchema);
 
 // Connect to MongoDB
-mongoose.set("strictQuery", true);
+mongoose.set("strictQuery", false); // Switch to false as per Mongoose's future behavior
+
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
