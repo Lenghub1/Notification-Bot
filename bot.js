@@ -1,7 +1,10 @@
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 const axios = require("axios");
+const fs = require("fs").promises;
 const mongoose = require("mongoose");
 require("dotenv").config();
+
+const API_URL = "https://api.watcher.guru/content/data?news=10";
 
 // MongoDB Schema to save last timestamp and article info
 const articleSchema = new mongoose.Schema({
@@ -13,9 +16,6 @@ const articleSchema = new mongoose.Schema({
 });
 
 const Article = mongoose.model("Article", articleSchema);
-
-// MongoDB URI and API URL
-const API_URL = "https://api.watcher.guru/content/data?news=10";
 
 // Connect to MongoDB
 mongoose.set("strictQuery", false); // Switch to false as per Mongoose's future behavior
@@ -118,21 +118,4 @@ client.once("ready", async () => {
   }, 60000); // Run every 1 minute
 });
 
-// Bot login
 client.login(process.env.BOT_TOKEN);
-
-// Optional: If you need to create an HTTP server alongside the bot
-// If you are using Render or similar service, you may want to listen on a dynamic port
-const express = require("express");
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Sample route if needed for your cloud platform
-app.get("/", (req, res) => {
-  res.send("Bot is running!");
-});
-
-// Listen on the correct port
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
