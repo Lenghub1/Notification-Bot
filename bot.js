@@ -19,7 +19,7 @@ const Article = mongoose.model("Article", articleSchema);
 const API_URL = "https://api.watcher.guru/content/data?news=10";
 
 // Connect to MongoDB
-mongoose.set("strictQuery", false); // Switch to false as per Mongoose's future behavior
+mongoose.set("strictQuery", false);
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -75,21 +75,24 @@ async function saveArticles(newArticles) {
 // Main bot logic
 client.once("ready", async () => {
   console.log(`🤖 Logged in as ${client.user.tag}`);
+  await client.user.setPresence({
+    status: "online",
+    activities: [{ name: "Fetching news", type: "WATCHING" }],
+  });
 
   let lastTimestamp = await initializeTimestamp();
   console.log(`Last timestamp: ${lastTimestamp}`);
 
   setInterval(async () => {
+    console.log("🔄 Checking for new articles...");
     try {
       const channel = await client.channels.fetch(process.env.CHANNEL_ID);
       if (!channel?.isTextBased()) return;
 
-      console.log("🔄 Checking for new articles...");
-
       const res = await axios.get(API_URL);
       const newArticles = res.data
         .filter((article) => article.published > lastTimestamp)
-        .sort((a, b) => a.published - b.published); // Oldest first
+        .sort((a, b) => a.published - b.published);
 
       if (newArticles.length) {
         for (const article of newArticles) {
@@ -108,9 +111,8 @@ client.once("ready", async () => {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
-        // Update lastTimestamp after sending new articles
         lastTimestamp = Math.max(...newArticles.map((a) => a.published));
-        await saveArticles(newArticles); // Save new articles to DB
+        await saveArticles(newArticles);
         console.log("✅ Articles sent.");
       }
     } catch (error) {
@@ -130,5 +132,16 @@ app.listen(PORT, () => {
   console.log(`✅ HTTP Server is listening on port ${PORT}`);
 });
 
+// Graceful shutdown handling
+process.on("SIGINT", async () => {
+  console.log("🤖 Shutting down bot...");
+  await client.destroy();
+  mongoose.connection.close();
+  console.log("✅ Bot shut down successfully");
+  process.exit(0);
+});
+
 // Bot login
-client.login(process.env.BOT_TOKEN);
+client.login(process.env.BOT_TOKEN).catch((error) => {
+  console.error("❌ Bot login failed:", error);
+});
