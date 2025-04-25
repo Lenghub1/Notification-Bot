@@ -107,14 +107,6 @@ client.once("ready", async () => {
 
         // ── Normalize & percent-encode any whitespace
         let thumb = article.image_hd;
-        if (typeof thumb === "string") {
-          thumb = thumb
-            .trim()
-            .replace(/\s+/g, " ")
-            .split(" ")
-            .map(encodeURIComponent)
-            .join("%20");
-        }
 
         // ── Build embed
         const embed = new EmbedBuilder()
