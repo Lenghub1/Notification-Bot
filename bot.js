@@ -144,7 +144,7 @@ client.once("ready", async () => {
     } catch (err) {
       console.error("❌ Error fetching or sending articles:", err);
     }
-  }, 5000);
+  }, 15000);
 });
 
 // Keep-alive HTTP server
