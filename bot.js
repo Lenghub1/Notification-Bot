@@ -133,7 +133,7 @@ client.once("ready", async () => {
           );
         }
 
-        await channel.send({ embeds: [embed] });
+        await channel.send("@everyone", { embeds: [embed] });
         // Simple rate-limit delay
         await new Promise((r) => setTimeout(r, 1000));
       }
