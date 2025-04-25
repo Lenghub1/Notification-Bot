@@ -124,8 +124,8 @@ client.once("ready", async () => {
             `⚠️ Skipped invalid thumbnail URL: "${article.image_hd}"`
           );
         }
-
-        await channel.send("@everyone", { embeds: [embed] });
+        await channel.send("@everyone");
+        await channel.send({ embeds: [embed] });
         // Simple rate-limit delay
         await new Promise((r) => setTimeout(r, 1000));
       }
