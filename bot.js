@@ -4,7 +4,9 @@ const Binance = require("binance-api-node").default;
 const axios = require("axios");
 const mongoose = require("mongoose");
 const express = require("express");
+
 const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+
 // MongoDB Schema for news articles
 const articleSchema = new mongoose.Schema({
   title: String,
@@ -44,48 +46,59 @@ const binance = Binance({
 let queue = [];
 let isSending = false;
 
-// Send message to a Discord channel
-const sendToDiscord = async (message, attempt = 1) => {
+// Color mapping
+const orderTypeColors = {
+  BUY: "#00FF00", // Green
+  SELL: "#FF0000", // Red
+  DEFAULT: "#808080", // Grey
+};
+
+const orderStatusColors = {
+  FILLED: "#00FFFF", // Cyan
+  CANCELED: "#FFA500", // Orange
+  EXPIRED: "#800080", // Purple
+  NEW: "#FFFF00", // Yellow
+  DEFAULT: "#808080", // Grey
+};
+
+// Send message to a Discord webhook
+const sendToDiscord = async (payload, attempt = 1) => {
   try {
-    await axios.post(discordWebhookUrl, { content: message });
+    await axios.post(discordWebhookUrl, payload);
     console.log("✅ Message sent to Discord");
   } catch (error) {
     console.error(
-      `❌ Error sending message to Discord (Attempt ${attempt}):`,
+      `❌ Error sending to Discord (Attempt ${attempt}):`,
       error.message
     );
-
     if (attempt < 3) {
-      // Exponential backoff: retry after 1s, 2s, 3s, etc.
       const delay = 1000 * attempt;
-      setTimeout(() => {
-        sendToDiscord(message, attempt + 1);
-      }, delay);
+      setTimeout(() => sendToDiscord(payload, attempt + 1), delay);
     } else {
       console.error("🚫 Giving up after 3 attempts.");
     }
   }
 };
-// Process message queue for Binance notifications
+
+// Process message queue
 const processQueue = async () => {
   if (isSending || queue.length === 0) return;
   isSending = true;
 
-  const { message } = queue.shift();
+  const { payload } = queue.shift();
   try {
-    await axios.post(discordWebhookUrl, { content: message });
-    console.log("✅ Message sent to Discord");
+    await sendToDiscord(payload);
   } catch (err) {
     console.error("❌ Discord send error:", err.message);
   }
 
   isSending = false;
-  setTimeout(processQueue, 1000); // 1 second delay between sends
+  setTimeout(processQueue, 1000);
 };
 
-// Add message to Binance queue
-const queueMessage = (message) => {
-  queue.push({ message });
+// Add message to queue
+const queueMessage = (payload) => {
+  queue.push({ payload });
   processQueue();
 };
 
@@ -100,7 +113,7 @@ async function initializeTimestamp() {
   }
 }
 
-// Save new articles to MongoDB
+// Save new articles
 async function saveArticles(articles) {
   try {
     await Article.insertMany(
@@ -138,22 +151,51 @@ client.once("ready", async () => {
     activities: [{ name: "Fetching news + Binance updates", type: "WATCHING" }],
   });
 
-  // Binance WebSocket for Futures account updates
+  // Binance WebSocket
   binance.ws.futuresUser((userData) => {
     if (userData.eventType === "ORDER_TRADE_UPDATE") {
-      let message = `🔔 **Futures Order Update**
-- **Symbol**: ${userData.symbol}
-- **Side**: ${userData.side}
-- **Type**: ${userData.orderType}
-- **Status**: ${userData.orderStatus}
-- **Execution Type**: ${userData.executionType}
-- **Quantity**: ${userData.quantity}
-- **Price**: ${userData.price}
-- **Average Price**: ${userData.averagePrice}
-- **Realized PnL**: ${userData.realizedProfit}
-- **Is Maker?**: ${userData.isMaker ? "Yes" : "No"}`;
+      const {
+        symbol,
+        side,
+        orderType,
+        orderStatus,
+        executionType,
+        quantity,
+        price,
+        averagePrice,
+        realizedProfit,
+        isMaker,
+      } = userData;
 
-      queueMessage(message);
+      const orderColor = orderTypeColors[side] || orderTypeColors.DEFAULT;
+      const statusColor =
+        orderStatusColors[orderStatus] || orderStatusColors.DEFAULT;
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🔔 Futures Order Update - ${symbol}`)
+        .setColor(orderColor)
+        .addFields(
+          { name: "Side", value: side, inline: true },
+          { name: "Type", value: orderType, inline: true },
+          { name: "Status", value: orderStatus, inline: true },
+          { name: "Execution", value: executionType, inline: true },
+          { name: "Quantity", value: quantity.toString(), inline: true },
+          { name: "Price", value: price.toString(), inline: true },
+          {
+            name: "Average Price",
+            value: averagePrice.toString(),
+            inline: true,
+          },
+          {
+            name: "Realized PnL",
+            value: realizedProfit.toString(),
+            inline: true,
+          },
+          { name: "Maker?", value: isMaker ? "Yes" : "No", inline: true }
+        )
+        .setTimestamp(new Date());
+
+      queueMessage({ embeds: [embed] });
     }
   });
   console.log("✅ Connected to Binance WebSocket");
@@ -208,7 +250,7 @@ client.once("ready", async () => {
     } catch (err) {
       console.error("❌ Error fetching or sending articles:", err);
     }
-  }, 30000); // every 30 seconds
+  }, 30000);
 });
 
 // Express Keep-Alive HTTP server
