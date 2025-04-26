@@ -152,6 +152,7 @@ client.once("ready", async () => {
   });
 
   // Binance WebSocket
+  // Binance WebSocket
   binance.ws.futuresUser((userData) => {
     if (userData.eventType === "ORDER_TRADE_UPDATE") {
       const {
@@ -167,37 +168,78 @@ client.once("ready", async () => {
         isMaker,
       } = userData;
 
+      // Mapping side colors (BUY/SELL)
+      const orderTypeColors = {
+        BUY: "#00FF00", // Green
+        SELL: "#FF0000", // Red
+        DEFAULT: "#808080", // Grey
+      };
+
+      // Mapping status colors (NEW, FILLED, CANCELED, etc.)
+      const orderStatusColors = {
+        NEW: "#FFFF00", // Yellow
+        FILLED: "#00FFFF", // Cyan
+        CANCELED: "#FFA500", // Orange
+        EXPIRED: "#800080", // Purple
+        DEFAULT: "#808080", // Grey
+      };
+
+      // Mapping status emojis
+      const statusEmojis = {
+        NEW: "🆕",
+        FILLED: "✅",
+        CANCELED: "❌",
+        EXPIRED: "⌛",
+        DEFAULT: "🔔",
+      };
+
+      // Pick colors and emoji
       const orderColor = orderTypeColors[side] || orderTypeColors.DEFAULT;
       const statusColor =
         orderStatusColors[orderStatus] || orderStatusColors.DEFAULT;
+      const statusEmoji = statusEmojis[orderStatus] || statusEmojis.DEFAULT;
 
+      // Final color: if NEW -> use side color (BUY/SELL), else use status color (FILLED/CANCELED)
+      const finalColor = orderStatus === "NEW" ? orderColor : statusColor;
+
+      // Build the Discord embed
       const embed = new EmbedBuilder()
-        .setTitle(`🔔 Futures Order Update - ${symbol}`)
-        .setColor(orderColor)
+        .setTitle(`${statusEmoji} Futures Order Update - ${symbol}`)
+        .setColor(finalColor)
         .addFields(
-          { name: "Side", value: side, inline: true },
-          { name: "Type", value: orderType, inline: true },
-          { name: "Status", value: orderStatus, inline: true },
-          { name: "Execution", value: executionType, inline: true },
-          { name: "Quantity", value: quantity.toString(), inline: true },
-          { name: "Price", value: price.toString(), inline: true },
+          { name: "Side", value: side || "Unknown", inline: true },
+          { name: "Type", value: orderType || "Unknown", inline: true },
+          { name: "Status", value: orderStatus || "Unknown", inline: true },
+          {
+            name: "Execution",
+            value: executionType || "Unknown",
+            inline: true,
+          },
+          {
+            name: "Quantity",
+            value: quantity?.toString() || "0",
+            inline: true,
+          },
+          { name: "Price", value: price?.toString() || "0", inline: true },
           {
             name: "Average Price",
-            value: averagePrice.toString(),
+            value: averagePrice?.toString() || "0",
             inline: true,
           },
           {
             name: "Realized PnL",
-            value: realizedProfit.toString(),
+            value: realizedProfit?.toString() || "0",
             inline: true,
           },
           { name: "Maker?", value: isMaker ? "Yes" : "No", inline: true }
         )
         .setTimestamp(new Date());
 
+      // Send embed to Discord (queued)
       queueMessage({ embeds: [embed] });
     }
   });
+
   console.log("✅ Connected to Binance WebSocket");
 
   // Watcher Guru News Monitoring
