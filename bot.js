@@ -151,8 +151,7 @@ client.once("ready", async () => {
 - **Price**: ${userData.price}
 - **Average Price**: ${userData.averagePrice}
 - **Realized PnL**: ${userData.realizedProfit}
-- **Is Maker?**: ${userData.isMaker ? "Yes" : "No"}
-- **Time**: ${new Date(userData.orderTime).toLocaleString()}`;
+- **Is Maker?**: ${userData.isMaker ? "Yes" : "No"}`;
 
       queueMessage(message);
     }
