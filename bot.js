@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const express = require("express");
 require("dotenv").config();
 
-// MongoDB Schema
+// MongoDB Schema to save last timestamp and article info
 const articleSchema = new mongoose.Schema({
   title: String,
   url: String,
@@ -37,7 +37,7 @@ const client = new Client({
   ],
 });
 
-// Initialize last timestamp
+// Initialize timestamp from MongoDB
 async function initializeTimestamp() {
   try {
     const latest = await Article.findOne().sort({ published: -1 });
@@ -48,7 +48,7 @@ async function initializeTimestamp() {
   }
 }
 
-// Save new articles
+// Save new articles to MongoDB
 async function saveArticles(articles) {
   try {
     await Article.insertMany(
@@ -65,7 +65,7 @@ async function saveArticles(articles) {
   }
 }
 
-// Validate image URL
+// Validate image URL (must end in common image extension)
 function isValidImageUrl(url) {
   try {
     const parsed = new URL(url);
@@ -82,7 +82,7 @@ client.once("ready", async () => {
   console.log(`🤖 Logged in as ${client.user.tag}`);
   await client.user.setPresence({
     status: "online",
-    activities: [{ name: "Watching for crypto news", type: "WATCHING" }],
+    activities: [{ name: "Fetching news", type: "WATCHING" }],
   });
 
   let lastTimestamp = await initializeTimestamp();
@@ -102,14 +102,11 @@ client.once("ready", async () => {
 
       if (newArticles.length === 0) return;
 
-      // 🔥 Send @everyone once
-      await channel.send(
-        `@everyone 🚨 **${newArticles.length} new crypto news articles!**`
-      );
-
       for (const article of newArticles) {
         console.log(`Processing article: ${article.title}`);
         console.log(`Raw Image URL: ${article.image_hd}`);
+
+        let thumb = article.image_hd;
 
         const embed = new EmbedBuilder()
           .setTitle(article.title)
@@ -118,32 +115,29 @@ client.once("ready", async () => {
           .setColor("#FF0000")
           .setTimestamp(article.published * 1000);
 
-        if (isValidImageUrl(article.image_hd)) {
-          embed.setThumbnail(article.image_hd);
+        if (isValidImageUrl(thumb)) {
+          embed.setThumbnail(thumb);
         } else {
-          console.warn(`⚠️ Skipped invalid thumbnail: "${article.image_hd}"`);
+          console.warn(
+            `⚠️ Skipped invalid thumbnail URL: "${article.image_hd}"`
+          );
         }
 
-        await channel.send({ embeds: [embed] });
-
-        // Update lastTimestamp and save after each article
-        lastTimestamp = article.published;
-        await Article.create({
-          title: article.title,
-          url: article.url,
-          description: article.description,
-          image_hd: article.image_hd,
-          published: article.published,
+        await channel.send({
+          content: "@everyone",
+          embeds: [embed],
         });
 
-        await new Promise((r) => setTimeout(r, 1000)); // simple rate-limit delay
+        await new Promise((r) => setTimeout(r, 1000)); // simple delay
       }
 
+      lastTimestamp = Math.max(...newArticles.map((a) => a.published));
+      await saveArticles(newArticles);
       console.log("✅ Articles sent.");
     } catch (err) {
       console.error("❌ Error fetching or sending articles:", err);
     }
-  }, 15000);
+  }, 30000); // check every 15 seconds
 });
 
 // Keep-alive HTTP server
